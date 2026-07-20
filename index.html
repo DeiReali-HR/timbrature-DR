@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timbratura Dipendente</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; box-sizing: border-box; }
+    h2 { margin-top: 0; color: #1e293b; }
+    .clock { font-size: 32px; font-weight: bold; color: #0f172a; margin: 16px 0; }
+    .status { font-size: 14px; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 20px; font-weight: 600; }
+    .status.out { background-color: #fee2e2; color: #991b1b; }
+    .status.in { background-color: #dcfce7; color: #166534; }
+    .btn-timbra { width: 100%; padding: 18px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; transition: background 0.3s; }
+    .btn-entry { background-color: #16a34a; }
+    .btn-exit { background-color: #dc2626; }
+    .btn-report { margin-top: 16px; width: 100%; padding: 12px; background-color: #2563eb; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .history { margin-top: 24px; text-align: left; }
+    .history h3 { font-size: 16px; color: #334155; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+    th { background-color: #f8fafc; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Timbratura Turno</h2>
+    <div id="current-date" style="color: #64748b; font-size: 14px;"></div>
+    <div class="clock" id="clock">00:00:00</div>
+    <div id="status-badge" class="status out">Fuori Servizio</div>
+    <button id="btn-action" class="btn-timbra btn-entry" onclick="toggleTimbratura()">TIMBRA ENTRATA</button>
+    <button class="btn-report" onclick="exportReport()">Esporta Report Mensile (CSV)</button>
+    <div class="history">
+      <h3>Ultime Timbrature</h3>
+      <table id="history-table">
+        <thead>
+          <tr><th>Data</th><th>Entrata</th><th>Uscita</th><th>Ore</th></tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleTimeString('it-IT');
+      document.getElementById('current-date').innerText = now.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+    function getStorage() { return JSON.parse(localStorage.getItem('timbrature_db') || '[]'); }
+    function saveStorage(data) { localStorage.setItem('timbrature_db', JSON.stringify(data)); }
+    function checkState() {
+      const db = getStorage(); const last = db[db.length - 1];
+      const btn = document.getElementById('btn-action'); const badge = document.getElementById('status-badge');
+      if (last && !last.uscita) {
+        btn.innerText = "TIMBRA USCITA"; btn.className = "btn-timbra btn-exit";
+        badge.innerText = "In Servizio"; badge.className = "status in";
+      } else {
+        btn.innerText = "TIMBRA ENTRATA"; btn.className = "btn-timbra btn-entry";
+        badge.innerText = "Fuori Servizio"; badge.className = "status out";
+      }
+      renderTable();
+    }
+    function toggleTimbratura() {
+      const db = getStorage(); const last = db[db.length - 1]; const now = new Date();
+      const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = now.toLocaleDateString('it-IT');
+      if (last && !last.uscita) {
+        last.uscita = timeStr;
+        const entryTime = new Date(last.timestampEntrata);
+        const diffMinutes = Math.round((now - entryTime) / (1000 * 60));
+        last.ore = (diffMinutes / 60).toFixed(2);
+      } else {
+        db.push({ data: dateStr, entrata: timeStr, uscita: "", ore: "0", timestampEntrata: now.toISOString() });
+      }
+      saveStorage(db); checkState();
+    }
+    function renderTable() {
+      const db = getStorage(); const tbody = document.getElementById('history-body'); tbody.innerHTML = "";
+      const recent = db.slice(-5).reverse();
+      recent.forEach(item => {
+        tbody.innerHTML += `<tr><td>${item.data}</td><td>${item.entrata}</td><td>${item.uscita || '-'}</td><td>${item.ore}h</td></tr>`;
+      });
+    }
+    function exportReport() {
+      const db = getStorage();
+      if (db.length === 0) { alert("Nessun dato da esportare."); return; }
+      let csv = "Data,Ingresso,Uscita,Ore Totali\n"; let totaleOre = 0;
+      db.forEach(item => {
+        csv += `${item.data},${item.entrata},${item.uscita || 'N/A'},${item.ore}\n`;
+        totaleOre += parseFloat(item.ore || 0);
+      });
+      csv += `\nTOTALE ORE MESE,,${totaleOre.toFixed(2)}h\n`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `Report_Timbrature_${new Date().getMonth() + 1}_${new Date().getFullYear()}.csv`;
+      a.click();
+    }
+    checkState();
+  </script>
+</body>
+</html>
