@@ -21,7 +21,7 @@
     .btn-pause { background-color: #d97706; }
     .btn-secondary { background-color: #2563eb; }
     .btn-alt { background-color: #0d9488; }
-    .btn-addfile { background-color: #0284c7; font-size: 14px; padding: 10px; }
+    .btn-addfile { background-color: #0284c7; font-size: 15px; padding: 12px; border-radius: 8px; margin: 8px 0; display: block; width: 100%; text-align: center; box-sizing: border-box; }
     .btn-send { background-color: #4f46e5; margin-top: 15px; }
     
     input, select, textarea { width: 100%; padding: 10px; margin: 6px 0 12px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
@@ -34,12 +34,12 @@
     
     .checkbox-container { display: flex; align-items: center; gap: 8px; font-size: 14px; text-align: left; margin: 15px 0 10px 0; }
     .checkbox-container input { width: auto; margin: 0; }
-    .file-hint { font-size: 12px; color: #64748b; margin-top: -4px; margin-bottom: 10px; display: block; }
+    .file-hint { font-size: 12px; color: #64748b; margin-bottom: 8px; display: block; }
     
-    .file-list { text-align: left; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-    .file-item { font-size: 13px; color: #334155; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 4px 0; border-bottom: 1px dotted #e2e8f0; }
+    .file-list { text-align: left; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; margin: 10px 0; }
+    .file-item { font-size: 13px; color: #334155; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 6px 0; border-bottom: 1px dotted #cbd5e1; }
     .file-item:last-child { border-bottom: none; margin-bottom: 0; }
-    .btn-remove { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 11px; }
+    .btn-remove { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -117,17 +117,20 @@
       <label><strong>Messaggio / Note aggiuntive:</strong></label>
       <textarea id="doc-messaggio" placeholder="Scrivi qui eventuali dettagli per l'amministrazione..."></textarea>
 
-      <!-- GESTIONE DOCUMENTI E FOTOCAMERA MULTIPLA -->
-      <label><strong>Scatta foto o carica allegati:</strong></label>
-      <input type="file" id="hidden-file-input" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="gestisciFileSelezionato(this)">
+      <!-- SEZIONE ALLEGATI E PULSANTE AGGIUNGI FILE -->
+      <label><strong>Documenti / Foto Allegati:</strong></label>
+      <span class="file-hint">Scatta le foto o seleziona fino a un massimo di 10 file.</span>
       
-      <button type="button" class="btn btn-addfile" onclick="triggerFileInput()">📷 Scatta Foto o Carica File</button>
-      <span class="file-hint">Puoi aggiungere fino a un massimo di 10 allegati per messaggio.</span>
+      <!-- Input file nascosto che si attiva tramite pulsante -->
+      <input type="file" id="file-picker" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="aggiungiFileSelezionato(this)">
+      
+      <!-- Pulsante sempre visibile -->
+      <button type="button" id="btn-add-more" class="btn btn-addfile" onclick="apriSelezionaFile()">📷 ➕ Scatta / Aggiungi File</button>
 
-      <!-- Elenco file inseriti -->
+      <!-- Elenco dinamico dei file allegati -->
       <div id="file-list-container" class="file-list" style="display:none;">
-        <strong>File pronti da inviare:</strong>
-        <div id="file-items"></div>
+        <strong id="file-count-title">Allegati pronti (0/10):</strong>
+        <div id="file-items" style="margin-top: 8px;"></div>
       </div>
 
       <div class="checkbox-container">
@@ -141,7 +144,7 @@
 
   <script>
     const ORARIO_INIZIO_TURNO = "08:30";
-    let allegatiArray = []; // Array temporaneo per gestire fino a 10 file caricati
+    let listaFileAllegati = []; // Array per contenere fino a 10 allegati
 
     function updateClock() {
       const now = new Date();
@@ -257,50 +260,54 @@
       });
     }
 
-    // Gestione Aggiunta File e Fotocamera
-    function triggerFileInput() {
-      if (allegatiArray.length >= 10) {
-        alert("Hai già raggiunto il limite massimo di 10 allegati.");
+    // --- LOGICA GESTIONE FILE & FOTOCAMERA ---
+    function apriSelezionaFile() {
+      if (listaFileAllegati.length >= 10) {
+        alert("Hai raggiunto il limite massimo di 10 allegati.");
         return;
       }
-      document.getElementById('hidden-file-input').click();
+      document.getElementById('file-picker').click();
     }
 
-    function gestisciFileSelezionato(input) {
+    function aggiungiFileSelezionato(input) {
       if (input.files && input.files[0]) {
-        const file = input.files[0];
-        allegatiArray.push(file);
-        renderFileList();
-        input.value = ""; // reset input per permettere nuovi scatti/scelte
+        listaFileAllegati.push(input.files[0]);
+        input.value = ""; // Resetta l'input per permettere lo scatto successivo
+        aggiornaVistaAllegati();
       }
     }
 
-    function rimuoviFile(index) {
-      allegatiArray.splice(index, 1);
-      renderFileList();
+    function rimuoviAllegato(index) {
+      listaFileAllegati.splice(index, 1);
+      aggiornaVistaAllegati();
     }
 
-    function renderFileList() {
+    function aggiornaVistaAllegati() {
       const container = document.getElementById('file-list-container');
       const listDiv = document.getElementById('file-items');
-      
-      if (allegatiArray.length === 0) {
+      const title = document.getElementById('file-count-title');
+      const btnAddMore = document.getElementById('btn-add-more');
+
+      if (listaFileAllegati.length === 0) {
         container.style.display = "none";
+        btnAddMore.innerText = "📷 ➕ Scatta / Aggiungi File";
         return;
       }
 
       container.style.display = "block";
+      title.innerText = `Allegati pronti (${listaFileAllegati.length}/10):`;
+      btnAddMore.innerText = "📷 ➕ Aggiungi un altro file / foto";
+
       listDiv.innerHTML = "";
-      allegatiArray.forEach((file, index) => {
+      listaFileAllegati.forEach((file, index) => {
         listDiv.innerHTML += `
           <div class="file-item">
-            <span>📎 ${file.name}</span>
-            <button type="button" class="btn-remove" onclick="rimuoviFile(${index})">Elimina</button>
+            <span>📎 <strong>${file.name}</strong></span>
+            <button type="button" class="btn-remove" onclick="rimuoviAllegato(${index})">Elimina</button>
           </div>`;
       });
     }
 
-    // Gestione Invio Documenti ed Email
     function inviaDocumenti(e) {
       e.preventDefault();
       const nome = document.getElementById('doc-nome').value;
@@ -311,9 +318,9 @@
 
       let bodyMail = `Nome Dipendente: ${nome}\nDocumento: ${tipo}\nOggetto: ${oggetto}\n\nMessaggio:\n${messaggio}`;
       
-      if (allegatiArray.length > 0) {
-        bodyMail += `\n\n--- ALLEGATI CARICATI (${allegatiArray.length}) ---`;
-        allegatiArray.forEach((file, idx) => {
+      if (listaFileAllegati.length > 0) {
+        bodyMail += `\n\n--- ALLEGATI CARICATI (${listaFileAllegati.length}) ---`;
+        listaFileAllegati.forEach((file, idx) => {
           bodyMail += `\n${idx + 1}. ${file.name}`;
         });
       }
@@ -325,7 +332,7 @@
       const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent('[HR App] ' + tipo + ' - ' + nome)}&body=${encodeURIComponent(bodyMail)}`;
       
       window.location.href = mailtoUrl;
-      alert(`Apertura mail in corso... Ricordati di confermare l'invio della mail contenente i tuoi ${allegatiArray.length} allegati!`);
+      alert(`Si aprirà la tua app di posta per inviare il messaggio con i tuoi ${listaFileAllegati.length} file allegati!`);
     }
 
     checkState();
