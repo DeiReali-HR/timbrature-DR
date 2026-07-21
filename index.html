@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestionale Presenze & Timbrature</title>
+  <title>Gestionale Presenze & HR</title>
+  <!-- EmailJS SDK per invio email e allegati -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
-    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; box-sizing: border-box; margin-bottom: 20px; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 480px; text-align: center; box-sizing: border-box; margin-bottom: 20px; }
     h2, h3 { margin-top: 0; color: #1e293b; }
     .clock { font-size: 32px; font-weight: bold; color: #0f172a; margin: 12px 0; }
     .status { font-size: 14px; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 16px; font-weight: 600; }
@@ -15,24 +17,29 @@
     .status.pause { background-color: #fef3c7; color: #92400e; }
     
     .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
-    .btn { width: 100%; padding: 14px; font-size: 15px; font-weight: bold; color: white; border: none; border-radius: 10px; cursor: pointer; }
+    .btn { width: 100%; padding: 14px; font-size: 15px; font-weight: bold; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 6px; }
     .btn-entry { background-color: #16a34a; }
     .btn-exit { background-color: #dc2626; }
     .btn-pause { background-color: #d97706; }
     .btn-secondary { background-color: #2563eb; }
-    .btn-alt { background-color: #4f46e5; }
+    .btn-alt { background-color: #0d9488; }
+    .btn-send { background-color: #4f46e5; }
     
     input, select, textarea { width: 100%; padding: 10px; margin: 6px 0 12px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+    textarea { resize: vertical; min-height: 80px; }
     
-    .section-title { text-align: left; font-size: 16px; margin-top: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
+    .section-title { text-align: left; font-size: 16px; margin-top: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; font-weight: bold; color: #334155; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
     th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
     th { background-color: #f8fafc; }
+    
+    .checkbox-container { display: flex; align-items: center; gap: 8px; font-size: 14px; text-align: left; margin: 10px 0; }
+    .checkbox-container input { width: auto; margin: 0; }
   </style>
 </head>
 <body>
 
-  <!-- SCHEDA TIMBRATURA E PAUSA -->
+  <!-- AREA 1: TIMBRATURA E REPORT -->
   <div class="card">
     <h2>Timbratura Turno</h2>
     <div id="current-date" style="color: #64748b; font-size: 14px;"></div>
@@ -49,17 +56,15 @@
     <div class="section-title">Ultime Timbrature</div>
     <table>
       <thead>
-        <tr><th>Data</th><th>Entrata</th><th>Pausa</th><th>Uscita</th><th>Note/Ritardo</th></tr>
+        <tr><th>Data</th><th>Entrata</th><th>Pausa</th><th>Uscita</th><th>Note</th></tr>
       </thead>
       <tbody id="history-body"></tbody>
     </table>
   </div>
 
-  <!-- SCHEDA RICHIESTE & GIUSTIFICATIVI -->
+  <!-- AREA 2: GIUSTIFICATIVI E MALATTIA -->
   <div class="card">
     <h2>Giustificativi & Malattia</h2>
-    
-    <!-- Protocollo Malattia -->
     <div style="text-align: left;">
       <label><strong>Invia Protocollo Malattia INPS:</strong></label>
       <input type="text" id="protocollo-inps" placeholder="Es. PUC123456789">
@@ -68,15 +73,14 @@
 
     <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e2e8f0;">
 
-    <!-- Richiesta Ferie/Permessi -->
     <div style="text-align: left;">
-      <label><strong>Richiesta Ferie / Permesso:</strong></label>
+      <label><strong>Richiesta Ferie / Permessi:</strong></label>
       <select id="tipo-richiesta">
         <option value="Ferie">Ferie</option>
         <option value="Permesso Orario">Permesso Orario</option>
         <option value="PAG">Permesso Retribuito</option>
       </select>
-      <label>Data Inizio / Giorno:</label>
+      <label>Data:</label>
       <input type="date" id="data-richiesta">
       <label>Note / Motivazione:</label>
       <input type="text" id="note-richiesta" placeholder="Dettagli opzionali...">
@@ -84,8 +88,44 @@
     </div>
   </div>
 
+  <!-- AREA 3: INVIO DOCUMENTI E COMUNICAZIONI PERSONALI -->
+  <div class="card">
+    <h2>Invio Documenti e Comunicazioni</h2>
+    <form id="doc-form" onsubmit="inviaDocumenti(event)" style="text-align: left;">
+      
+      <label><strong>Nome e Cognome Dipendente:</strong></label>
+      <input type="text" id="doc-nome" required placeholder="Es. Mario Rossi">
+
+      <label><strong>Tipo / Oggetto Documento:</strong></label>
+      <select id="doc-tipo" required>
+        <option value="">-- Seleziona Tipo --</option>
+        <option value="Carta d'Identità">Carta d'Identità</option>
+        <option value="Codice Fiscale">Codice Fiscale</option>
+        <option value="Permesso di Soggiorno">Permesso di Soggiorno</option>
+        <option value="Rinnovo Permesso di Soggiorno">Rinnovo Permesso di Soggiorno</option>
+        <option value="Altro Documento">Altro Documento Generico</option>
+      </select>
+
+      <label><strong>Specifica / Oggetto della Richiesta:</strong></label>
+      <input type="text" id="doc-oggetto" required placeholder="Es. Rinnovo documento in scadenza">
+
+      <label><strong>Messaggio / Note aggiuntive:</strong></label>
+      <textarea id="doc-messaggio" placeholder="Scrivi qui eventuali dettagli per l'amministrazione..."></textarea>
+
+      <label><strong>Carica o Scatta Foto Documento:</strong></label>
+      <!-- accept="image/*,application/pdf" apre direttamente fotocamera o file su mobile -->
+      <input type="file" id="doc-file" accept="image/*,application/pdf" capture="environment">
+
+      <div class="checkbox-container">
+        <input type="checkbox" id="allegati-presenze">
+        <label for="allegati-presenze"><strong>Allega anche il Foglio Presenze (CSV)</strong></label>
+      </div>
+
+      <button type="submit" class="btn btn-send">INVIA A AMMINISTRAZIONE</button>
+    </form>
+  </div>
+
   <script>
-    // Configurazione orario di lavoro standard per il controllo ritardo (HH:MM)
     const ORARIO_INIZIO_TURNO = "08:30";
 
     function updateClock() {
@@ -108,7 +148,6 @@
       if (last && !last.uscita) {
         btnAction.innerText = "TIMBRA USCITA"; btnAction.className = "btn btn-exit";
         btnPause.style.display = "block";
-        
         if (last.inPausa) {
           badge.innerText = "In Pausa"; badge.className = "status pause";
           btnPause.innerText = "FINE PAUSA";
@@ -130,14 +169,12 @@
       const dateStr = now.toLocaleDateString('it-IT');
 
       if (last && !last.uscita) {
-        // Timbra Uscita
         last.uscita = timeStr;
         if (last.inPausa) last.inPausa = false;
       } else {
-        // Timbra Entrata (Verifica Ritardo)
         let note = "";
         if (timeStr > ORARIO_INIZIO_TURNO) {
-          const motivo = prompt(`Sei in ritardo rispetto alle ${ORARIO_INIZIO_TURNO}. Inserisci il giustificativo/motivazione:`);
+          const motivo = prompt(`Sei in ritardo rispetto alle ${ORARIO_INIZIO_TURNO}. Inserisci motivazione:`);
           note = motivo ? `Ritardo: ${motivo}` : "Ritardo non giustificato";
         }
         db.push({ data: dateStr, entrata: timeStr, uscita: "", minutiPausa: 0, inPausa: false, note: note });
@@ -148,14 +185,12 @@
     function togglePausa() {
       const db = getStorage(); const last = db[db.length - 1];
       if (!last || last.uscita) return;
-
       const now = new Date();
       if (!last.inPausa) {
-        last.inPausa = true;
-        last.inizioPausa = now.getTime();
+        last.inPausa = true; last.inizioPausa = now.getTime();
       } else {
         last.inPausa = false;
-        const durataPausa = Math.round((now.getTime() - last.inizioPausa) / 60000); // minuti
+        const durataPausa = Math.round((now.getTime() - last.inizioPausa) / 60000);
         last.minutiPausa = (last.minutiPausa || 0) + durataPausa;
       }
       saveStorage(db); checkState();
@@ -168,8 +203,7 @@
       db.push({ data: new Date().toLocaleDateString('it-IT'), entrata: "MALATTIA", uscita: "-", minutiPausa: 0, note: `Prot. INPS: ${prot}` });
       saveStorage(db);
       document.getElementById('protocollo-inps').value = "";
-      checkState();
-      alert("Protocollo malattia registrato con successo!");
+      checkState(); alert("Protocollo malattia registrato con successo!");
     }
 
     function inviaRichiesta() {
@@ -178,39 +212,56 @@
       const note = document.getElementById('note-richiesta').value;
       if (!data) { alert("Seleziona una data."); return; }
       const db = getStorage();
-      db.push({ data: new Date(data).toLocaleDateString('it-IT'), entrata: tipo.toUpperCase(), uscita: "-", minutiPausa: 0, note: note || "In attesa approvazione" });
+      db.push({ data: new Date(data).toLocaleDateString('it-IT'), entrata: tipo.toUpperCase(), uscita: "-", minutiPausa: 0, note: note || "In attesa" });
       saveStorage(db);
       document.getElementById('note-richiesta').value = "";
-      checkState();
-      alert(`Richiesta ${tipo} inviata con successo!`);
+      checkState(); alert(`Richiesta ${tipo} registrata!`);
+    }
+
+    function generateCSVString() {
+      const db = getStorage();
+      let csv = "Data,Ingresso,Pausa(minuti),Uscita,Note\n";
+      db.forEach(item => { csv += `"${item.data}","${item.entrata}","${item.minutiPausa || 0}","${item.uscita || '-'}","${item.note || '-'}"\n`; });
+      return csv;
+    }
+
+    function exportReport() {
+      const csv = generateCSVString();
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `Report_Presenze_${new Date().getMonth() + 1}_${new Date().getFullYear()}.csv`;
+      a.click();
     }
 
     function renderTable() {
       const db = getStorage(); const tbody = document.getElementById('history-body'); tbody.innerHTML = "";
       const recent = db.slice(-5).reverse();
       recent.forEach(item => {
-        tbody.innerHTML += `<tr>
-          <td>${item.data}</td>
-          <td>${item.entrata}</td>
-          <td>${item.minutiPausa ? item.minutiPausa + 'm' : '-'}</td>
-          <td>${item.uscita || '-'}</td>
-          <td>${item.note || '-'}</td>
-        </tr>`;
+        tbody.innerHTML += `<tr><td>${item.data}</td><td>${item.entrata}</td><td>${item.minutiPausa ? item.minutiPausa + 'm' : '-'}</td><td>${item.uscita || '-'}</td><td>${item.note || '-'}</td></tr>`;
       });
     }
 
-    function exportReport() {
-      const db = getStorage();
-      if (db.length === 0) { alert("Nessun dato da esportare."); return; }
-      let csv = "Data,Ingresso,Pausa(minuti),Uscita,Note/Giustificativo\n";
-      db.forEach(item => {
-        csv += `"${item.data}","${item.entrata}","${item.minutiPausa || 0}","${item.uscita || '-'}","${item.note || '-'}"\n`;
-      });
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url;
-      a.download = `Report_Presenze_${new Date().getMonth() + 1}_${new Date().getFullYear()}.csv`;
-      a.click();
+    // Gestione Invio Documenti ed Email
+    function inviaDocumenti(e) {
+      e.preventDefault();
+      const nome = document.getElementById('doc-nome').value;
+      const tipo = document.getElementById('doc-tipo').value;
+      const oggetto = document.getElementById('doc-oggetto').value;
+      const messaggio = document.getElementById('doc-messaggio').value;
+      const allegaPresenze = document.getElementById('allegati-presenze').checked;
+
+      let bodyMail = `Nome Dipendente: ${nome}\nDocumento: ${tipo}\nOggetto: ${oggetto}\n\nMessaggio:\n${messaggio}`;
+      
+      if (allegaPresenze) {
+        bodyMail += `\n\n--- FOGLIO PRESENZE ---\n` + generateCSVString();
+      }
+
+      // Preparazione mailto nativa come fallback di sicurezza rapido
+      const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent('[HR App] ' + tipo + ' - ' + nome)}&body=${encodeURIComponent(bodyMail)}`;
+      
+      window.location.href = mailtoUrl;
+      alert("Si aprirà la tua applicazione di posta per completare l'invio allegando la foto scattata!");
     }
 
     checkState();
