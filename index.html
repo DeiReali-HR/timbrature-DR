@@ -19,8 +19,8 @@
     .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 480px; text-align: center; box-sizing: border-box; margin-bottom: 20px; }
     h2, h3 { margin-top: 0; color: #1e293b; }
     
-    .logo-container { margin-bottom: 15px; }
-    .logo-img { max-width: 90px; height: auto; border-radius: 12px; }
+    .logo-container { margin-bottom: 10px; display: flex; justify-content: center; }
+    .logo-img { max-width: 100px; height: auto; border-radius: 8px; }
 
     .clock { font-size: 32px; font-weight: bold; color: #0f172a; margin: 12px 0; }
     .status { font-size: 14px; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 16px; font-weight: 600; }
@@ -30,7 +30,7 @@
     
     .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
     .btn { width: 100%; padding: 14px; font-size: 15px; font-weight: bold; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 6px; }
-    .btn-install { background-color: #0284c7; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-install { background-color: #0284c7; margin-bottom: 15px; display: block !important; width: 100%; }
     .btn-entry { background-color: #16a34a; }
     .btn-exit { background-color: #dc2626; }
     .btn-pause { background-color: #d97706; }
@@ -65,13 +65,13 @@
   <!-- AREA 1: TIMBRATURA E REPORT -->
   <div class="card">
     
-    <!-- PULSANTE PER INSTALLAZIONE RAPIDA SU DESKTOP / HOME -->
+    <!-- PULSANTE SEMPRE VISIBILE -->
     <button id="btn-install-pwa" class="btn btn-install" onclick="installaApp()">
-      📲 Aggiungi App al Desktop / Home
+      📲 Salva App su Desktop / Schermata Home
     </button>
 
     <div class="logo-container">
-      <img src="DR_Corp.png" alt="DR Corp Logo" class="logo-img" onerror="this.style.display='none'">
+      <img src="DR_Corp.png" alt="DR Corp Logo" class="logo-img">
     </div>
 
     <h2>Timbratura Turno</h2>
@@ -186,26 +186,25 @@
     let listaFileAllegati = [];
     let deferredPrompt = null;
 
-    // --- GESTIONE INSTALLAZIONE AUTOMATICA APP/DESKTOP ---
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const btnInstall = document.getElementById('btn-install-pwa');
-      if (btnInstall) btnInstall.style.display = 'block';
     });
 
     function installaApp() {
       if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('L\'utente ha accettato l\'installazione');
-          }
           deferredPrompt = null;
         });
       } else {
-        // Istruzioni manuali per iPhone o browser senza prompt automatico
-        alert("Per aggiungere l'icona sul Desktop/Schermata Home:\n\n- Su iPhone/Safari: premi il tasto Condividi (📤) e seleziona 'Aggiungi alla schermata Home'.\n- Su Android/Chrome: premi i 3 pallini in alto a destra e seleziona 'Aggiungi a schermata Home'.\n- Su PC: clicca sui 3 pallini -> Salva e condividi -> Crea scorciatoia.");
+        alert("📌 GUIDA ALL'INSTALLAZIONE:\n\n" +
+              "• Da Smartphone iPhone / iPad:\n" +
+              "Tocca l'icona 'Condividi' 📤 in basso e seleziona 'Aggiungi alla schermata Home'.\n\n" +
+              "• Da Smartphone Android:\n" +
+              "Tocca i 3 pallini ⁝ in alto a destra e seleziona 'Aggiungi a schermata Home'.\n\n" +
+              "• Da PC (Chrome / Edge):\n" +
+              "Clicca i 3 pallini ⁝ in alto a destra -> 'Salva e condividi' -> 'Crea scorciatoia...'.");
       }
     }
 
@@ -256,7 +255,7 @@
         let note = "";
         if (timeStr > ORARIO_INIZIO_TURNO) {
           const motivo = prompt(`Sei in ritardo rispetto alle ${ORARIO_INIZIO_TURNO}. Inserisci motivazione:`);
-          note = motivo ? `Ritardo: ${motivo}` : "Ritardo non justified";
+          note = motivo ? `Ritardo: ${motivo}` : "Ritardo non giustificato";
         }
         db.push({ data: dateStr, entrata: timeStr, uscita: "", minutiPausa: 0, inPausa: false, note: note });
       }
@@ -287,7 +286,6 @@
       checkState(); alert("Protocollo malattia registrato con successo!");
     }
 
-    // --- INVIO RICHIESTA FERIE / PERMESSI VIA EMAIL ---
     function inviaRichiestaFerie(e) {
       e.preventDefault();
       const nome = document.getElementById('ferie-nome').value;
@@ -338,7 +336,6 @@
       });
     }
 
-    // --- GESTIONE ALLEGATI ---
     function apriSelezionaFile() {
       if (listaFileAllegati.length >= 10) {
         alert("Hai raggiunto il limite massimo di 10 allegati.");
@@ -386,7 +383,6 @@
       });
     }
 
-    // --- INVIO DOCUMENTI CON GENERAZIONE AUTOMATICA FILE ZIP ---
     async function inviaDocumenti(e) {
       e.preventDefault();
       const btnSubmit = document.getElementById('btn-submit-doc');
