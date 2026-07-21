@@ -21,7 +21,8 @@
     .btn-pause { background-color: #d97706; }
     .btn-secondary { background-color: #2563eb; }
     .btn-alt { background-color: #0d9488; }
-    .btn-send { background-color: #4f46e5; }
+    .btn-addfile { background-color: #0284c7; font-size: 14px; padding: 10px; }
+    .btn-send { background-color: #4f46e5; margin-top: 15px; }
     
     input, select, textarea { width: 100%; padding: 10px; margin: 6px 0 12px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
     textarea { resize: vertical; min-height: 80px; }
@@ -31,9 +32,14 @@
     th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
     th { background-color: #f8fafc; }
     
-    .checkbox-container { display: flex; align-items: center; gap: 8px; font-size: 14px; text-align: left; margin: 10px 0; }
+    .checkbox-container { display: flex; align-items: center; gap: 8px; font-size: 14px; text-align: left; margin: 15px 0 10px 0; }
     .checkbox-container input { width: auto; margin: 0; }
-    .file-hint { font-size: 12px; color: #64748b; margin-top: -8px; margin-bottom: 12px; display: block; }
+    .file-hint { font-size: 12px; color: #64748b; margin-top: -4px; margin-bottom: 10px; display: block; }
+    
+    .file-list { text-align: left; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .file-item { font-size: 13px; color: #334155; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 4px 0; border-bottom: 1px dotted #e2e8f0; }
+    .file-item:last-child { border-bottom: none; margin-bottom: 0; }
+    .btn-remove { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -111,10 +117,18 @@
       <label><strong>Messaggio / Note aggiuntive:</strong></label>
       <textarea id="doc-messaggio" placeholder="Scrivi qui eventuali dettagli per l'amministrazione..."></textarea>
 
-      <label><strong>Carica Allegati (Max 10 file/foto):</strong></label>
-      <!-- aggiunta selezione multipla -->
-      <input type="file" id="doc-file" accept="image/*,application/pdf" multiple onchange="validaAllegati(this)">
-      <span class="file-hint">Puoi selezionare o scattare fino a 10 foto/file per messaggio.</span>
+      <!-- GESTIONE DOCUMENTI E FOTOCAMERA MULTIPLA -->
+      <label><strong>Scatta foto o carica allegati:</strong></label>
+      <input type="file" id="hidden-file-input" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="gestisciFileSelezionato(this)">
+      
+      <button type="button" class="btn btn-addfile" onclick="triggerFileInput()">📷 Scatta Foto o Carica File</button>
+      <span class="file-hint">Puoi aggiungere fino a un massimo di 10 allegati per messaggio.</span>
+
+      <!-- Elenco file inseriti -->
+      <div id="file-list-container" class="file-list" style="display:none;">
+        <strong>File pronti da inviare:</strong>
+        <div id="file-items"></div>
+      </div>
 
       <div class="checkbox-container">
         <input type="checkbox" id="allegati-presenze">
@@ -127,6 +141,7 @@
 
   <script>
     const ORARIO_INIZIO_TURNO = "08:30";
+    let allegatiArray = []; // Array temporaneo per gestire fino a 10 file caricati
 
     function updateClock() {
       const now = new Date();
@@ -242,12 +257,47 @@
       });
     }
 
-    // Controllo massimo 10 allegati
-    function validaAllegati(input) {
-      if (input.files.length > 10) {
-        alert("Puoi caricare un massimo di 10 file alla volta.");
-        input.value = ""; // svuota la selezione
+    // Gestione Aggiunta File e Fotocamera
+    function triggerFileInput() {
+      if (allegatiArray.length >= 10) {
+        alert("Hai già raggiunto il limite massimo di 10 allegati.");
+        return;
       }
+      document.getElementById('hidden-file-input').click();
+    }
+
+    function gestisciFileSelezionato(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        allegatiArray.push(file);
+        renderFileList();
+        input.value = ""; // reset input per permettere nuovi scatti/scelte
+      }
+    }
+
+    function rimuoviFile(index) {
+      allegatiArray.splice(index, 1);
+      renderFileList();
+    }
+
+    function renderFileList() {
+      const container = document.getElementById('file-list-container');
+      const listDiv = document.getElementById('file-items');
+      
+      if (allegatiArray.length === 0) {
+        container.style.display = "none";
+        return;
+      }
+
+      container.style.display = "block";
+      listDiv.innerHTML = "";
+      allegatiArray.forEach((file, index) => {
+        listDiv.innerHTML += `
+          <div class="file-item">
+            <span>📎 ${file.name}</span>
+            <button type="button" class="btn-remove" onclick="rimuoviFile(${index})">Elimina</button>
+          </div>`;
+      });
     }
 
     // Gestione Invio Documenti ed Email
@@ -258,12 +308,14 @@
       const oggetto = document.getElementById('doc-oggetto').value;
       const messaggio = document.getElementById('doc-messaggio').value;
       const allegaPresenze = document.getElementById('allegati-presenze').checked;
-      const fileInput = document.getElementById('doc-file');
 
       let bodyMail = `Nome Dipendente: ${nome}\nDocumento: ${tipo}\nOggetto: ${oggetto}\n\nMessaggio:\n${messaggio}`;
       
-      if (fileInput.files.length > 0) {
-        bodyMail += `\n\n--- ALLEGATI --- \nNumero file selezionati: ${fileInput.files.length}`;
+      if (allegatiArray.length > 0) {
+        bodyMail += `\n\n--- ALLEGATI CARICATI (${allegatiArray.length}) ---`;
+        allegatiArray.forEach((file, idx) => {
+          bodyMail += `\n${idx + 1}. ${file.name}`;
+        });
       }
 
       if (allegaPresenze) {
@@ -273,7 +325,7 @@
       const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent('[HR App] ' + tipo + ' - ' + nome)}&body=${encodeURIComponent(bodyMail)}`;
       
       window.location.href = mailtoUrl;
-      alert(`Si aprirà la tua applicazione di posta per inviare il messaggio con i tuoi ${fileInput.files.length} allegati!`);
+      alert(`Apertura mail in corso... Ricordati di confermare l'invio della mail contenente i tuoi ${allegatiArray.length} allegati!`);
     }
 
     checkState();
