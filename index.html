@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestionale Presenze & HR</title>
+  
+  <!-- Libreria JSZip per la creazione dinamica del file ZIP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
     .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 480px; text-align: center; box-sizing: border-box; margin-bottom: 20px; }
@@ -27,6 +31,9 @@
     input, select, textarea { width: 100%; padding: 10px; margin: 6px 0 12px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
     textarea { resize: vertical; min-height: 80px; }
     
+    .date-row { display: flex; gap: 10px; }
+    .date-row > div { flex: 1; }
+
     .section-title { text-align: left; font-size: 16px; margin-top: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; font-weight: bold; color: #334155; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
     th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
@@ -67,9 +74,10 @@
     </table>
   </div>
 
-  <!-- AREA 2: GIUSTIFICATIVI E MALATTIA -->
+  <!-- AREA 2: GIUSTIFICATIVI E FERIE/PERMESSI -->
   <div class="card">
-    <h2>Giustificativi & Malattia</h2>
+    <h2>Giustificativi & Ferie/Permessi</h2>
+    
     <div style="text-align: left;">
       <label><strong>Invia Protocollo Malattia INPS:</strong></label>
       <input type="text" id="protocollo-inps" placeholder="Es. PUC123456789">
@@ -78,19 +86,33 @@
 
     <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e2e8f0;">
 
-    <div style="text-align: left;">
-      <label><strong>Richiesta Ferie / Permessi:</strong></label>
-      <select id="tipo-richiesta">
+    <form onsubmit="inviaRichiestaFerie(event)" style="text-align: left;">
+      <label><strong>Nome e Cognome Dipendente:</strong></label>
+      <input type="text" id="ferie-nome" required placeholder="Es. Mario Rossi">
+
+      <label><strong>Tipo di Richiesta:</strong></label>
+      <select id="tipo-richiesta" required>
         <option value="Ferie">Ferie</option>
         <option value="Permesso Orario">Permesso Orario</option>
-        <option value="PAG">Permesso Retribuito</option>
+        <option value="PAG">Permesso Retribuito (PAG)</option>
       </select>
-      <label>Data:</label>
-      <input type="date" id="data-richiesta">
-      <label>Note / Motivazione:</label>
-      <input type="text" id="note-richiesta" placeholder="Dettagli opzionali...">
-      <button class="btn btn-secondary" onclick="inviaRichiesta()">Invia Richiesta</button>
-    </div>
+
+      <div class="date-row">
+        <div>
+          <label><strong>Data Inizio (Dal):</strong></label>
+          <input type="date" id="data-inizio" required>
+        </div>
+        <div>
+          <label><strong>Data Fine (Al):</strong></label>
+          <input type="date" id="data-fine" required>
+        </div>
+      </div>
+
+      <label><strong>Motivazione / Note:</strong></label>
+      <input type="text" id="note-richiesta" placeholder="Dettagli aggiuntivi opzionali...">
+      
+      <button type="submit" class="btn btn-secondary">Invia Richiesta via Mail</button>
+    </form>
   </div>
 
   <!-- AREA 3: INVIO DOCUMENTI E COMUNICAZIONI PERSONALI -->
@@ -117,17 +139,13 @@
       <label><strong>Messaggio / Note aggiuntive:</strong></label>
       <textarea id="doc-messaggio" placeholder="Scrivi qui eventuali dettagli per l'amministrazione..."></textarea>
 
-      <!-- SEZIONE ALLEGATI E PULSANTE AGGIUNGI FILE -->
+      <!-- SEZIONE ALLEGATI CON ZIP -->
       <label><strong>Documenti / Foto Allegati:</strong></label>
-      <span class="file-hint">Scatta le foto o seleziona fino a un massimo di 10 file.</span>
+      <span class="file-hint">Scatta le foto o seleziona fino a 10 file (verranno compressi in un file ZIP).</span>
       
-      <!-- Input file nascosto che si attiva tramite pulsante -->
       <input type="file" id="file-picker" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="aggiungiFileSelezionato(this)">
-      
-      <!-- Pulsante sempre visibile -->
       <button type="button" id="btn-add-more" class="btn btn-addfile" onclick="apriSelezionaFile()">📷 ➕ Scatta / Aggiungi File</button>
 
-      <!-- Elenco dinamico dei file allegati -->
       <div id="file-list-container" class="file-list" style="display:none;">
         <strong id="file-count-title">Allegati pronti (0/10):</strong>
         <div id="file-items" style="margin-top: 8px;"></div>
@@ -135,16 +153,16 @@
 
       <div class="checkbox-container">
         <input type="checkbox" id="allegati-presenze">
-        <label for="allegati-presenze"><strong>Allega anche il Foglio Presenze (CSV)</strong></label>
+        <label for="allegati-presenze"><strong>Includi Report Presenze (CSV) nello ZIP</strong></label>
       </div>
 
-      <button type="submit" class="btn btn-send">INVIA A AMMINISTRAZIONE</button>
+      <button type="submit" id="btn-submit-doc" class="btn btn-send">INVIA A AMMINISTRAZIONE</button>
     </form>
   </div>
 
   <script>
     const ORARIO_INIZIO_TURNO = "08:30";
-    let listaFileAllegati = []; // Array per contenere fino a 10 allegati
+    let listaFileAllegati = [];
 
     function updateClock() {
       const now = new Date();
@@ -224,16 +242,32 @@
       checkState(); alert("Protocollo malattia registrato con successo!");
     }
 
-    function inviaRichiesta() {
+    // --- INVIO RICHIESTA FERIE / PERMESSI VIA EMAIL ---
+    function inviaRichiestaFerie(e) {
+      e.preventDefault();
+      const nome = document.getElementById('ferie-nome').value;
       const tipo = document.getElementById('tipo-richiesta').value;
-      const data = document.getElementById('data-richiesta').value;
+      const dataInizio = document.getElementById('data-inizio').value;
+      const dataFine = document.getElementById('data-fine').value;
       const note = document.getElementById('note-richiesta').value;
-      if (!data) { alert("Seleziona una data."); return; }
+
+      const bodyMail = `Richiesta Ferie/Permessi\n\n` +
+                       `Dipendente: ${nome}\n` +
+                       `Tipologia: ${tipo}\n` +
+                       `Data Inizio: ${dataInizio}\n` +
+                       `Data Fine: ${dataFine}\n` +
+                       `Motivazione/Note: ${note || 'Nessuna nota aggiuntiva'}`;
+
+      const subject = `[Richiesta ${tipo}] ${nome} - dal ${dataInizio} al ${dataFine}`;
+      const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyMail)}`;
+
+      // Registrazione automatica anche nel registro storico locale
       const db = getStorage();
-      db.push({ data: new Date(data).toLocaleDateString('it-IT'), entrata: tipo.toUpperCase(), uscita: "-", minutiPausa: 0, note: note || "In attesa" });
+      db.push({ data: `${dataInizio} al ${dataFine}`, entrata: tipo.toUpperCase(), uscita: "-", minutiPausa: 0, note: `${nome} - ${note || 'Richiesta Inviata'}` });
       saveStorage(db);
-      document.getElementById('note-richiesta').value = "";
-      checkState(); alert(`Richiesta ${tipo} registrata!`);
+      checkState();
+
+      window.location.href = mailtoUrl;
     }
 
     function generateCSVString() {
@@ -260,7 +294,7 @@
       });
     }
 
-    // --- LOGICA GESTIONE FILE & FOTOCAMERA ---
+    // --- GESTIONE ALLEGATI ---
     function apriSelezionaFile() {
       if (listaFileAllegati.length >= 10) {
         alert("Hai raggiunto il limite massimo di 10 allegati.");
@@ -272,7 +306,7 @@
     function aggiungiFileSelezionato(input) {
       if (input.files && input.files[0]) {
         listaFileAllegati.push(input.files[0]);
-        input.value = ""; // Resetta l'input per permettere lo scatto successivo
+        input.value = "";
         aggiornaVistaAllegati();
       }
     }
@@ -308,31 +342,61 @@
       });
     }
 
-    function inviaDocumenti(e) {
+    // --- INVIO DOCUMENTI CON GENERAZIONE AUTOMATICA FILE ZIP ---
+    async function inviaDocumenti(e) {
       e.preventDefault();
+      const btnSubmit = document.getElementById('btn-submit-doc');
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = "Generazione ZIP in corso...";
+
       const nome = document.getElementById('doc-nome').value;
       const tipo = document.getElementById('doc-tipo').value;
       const oggetto = document.getElementById('doc-oggetto').value;
       const messaggio = document.getElementById('doc-messaggio').value;
       const allegaPresenze = document.getElementById('allegati-presenze').checked;
 
-      let bodyMail = `Nome Dipendente: ${nome}\nDocumento: ${tipo}\nOggetto: ${oggetto}\n\nMessaggio:\n${messaggio}`;
+      const zip = new JSZip();
       
+      // Aggiunta file al pacchetto ZIP
       if (listaFileAllegati.length > 0) {
-        bodyMail += `\n\n--- ALLEGATI CARICATI (${listaFileAllegati.length}) ---`;
         listaFileAllegati.forEach((file, idx) => {
-          bodyMail += `\n${idx + 1}. ${file.name}`;
+          zip.file(`${idx + 1}_${file.name}`, file);
         });
       }
 
+      // Inclusione eventuale file presenze CSV
       if (allegaPresenze) {
-        bodyMail += `\n\n--- FOGLIO PRESENZE ---\n` + generateCSVString();
+        zip.file("Foglio_Presenze.csv", generateCSVString());
       }
 
-      const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent('[HR App] ' + tipo + ' - ' + nome)}&body=${encodeURIComponent(bodyMail)}`;
-      
+      const zipFilename = `Documenti_${nome.replace(/\s+/g, '_')}.zip`;
+
+      // Generazione e download automatico dello ZIP
+      if (listaFileAllegati.length > 0 || allegaPresenze) {
+        const content = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(content);
+        link.download = zipFilename;
+        link.click();
+      }
+
+      // Messaggio precompilato per il client di posta
+      let bodyMail = `Nome Dipendente: ${nome}\n` +
+                     `Documento: ${tipo}\n` +
+                     `Oggetto: ${oggetto}\n\n` +
+                     `Messaggio:\n${messaggio}\n\n` +
+                     `--------------------------------------------------\n` +
+                     `⚠️ NOTA IMPORTANTE:\n` +
+                     `Il file ZIP contenente i documenti ("${zipFilename}") è stato scaricato automaticamente sul tuo dispositivo.\n` +
+                     `Ricordati di ALLEGARE il file ZIP a questa email prima di premere Invia!`;
+
+      const subject = `[HR Documenti] ${tipo} - ${nome}`;
+      const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyMail)}`;
+
       window.location.href = mailtoUrl;
-      alert(`Si aprirà la tua app di posta per inviare il messaggio con i tuoi ${listaFileAllegati.length} file allegati!`);
+
+      btnSubmit.disabled = false;
+      btnSubmit.innerText = "INVIA A AMMINISTRAZIONE";
     }
 
     checkState();
