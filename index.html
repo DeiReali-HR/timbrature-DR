@@ -38,6 +38,7 @@
     .btn-pause { background-color: #d97706; }
     .btn-secondary { background-color: #2563eb; }
     .btn-alt { background-color: #0d9488; }
+    .btn-rain { background-color: #0284c7; margin-top: 8px; }
     .btn-addfile { background-color: #0284c7; font-size: 15px; padding: 12px; border-radius: 8px; margin: 8px 0; display: block; width: 100%; text-align: center; box-sizing: border-box; }
     .btn-send { background-color: #4f46e5; margin-top: 15px; }
     
@@ -64,6 +65,7 @@
 </head>
 <body>
 
+  <!-- AREA 1: TIMBRATURA E REPORT -->
   <div class="card">
     <button id="btn-install-pwa" class="btn btn-install" onclick="installaApp()">
       📲 Installa App su Desktop / Schermata Home
@@ -94,9 +96,24 @@
     </table>
   </div>
 
+  <!-- AREA 2: GIUSTIFICATIVI, PIOGGIA & FERIE/PERMESSI -->
   <div class="card">
-    <h2>Giustificativi & Ferie/Permessi</h2>
-    
+    <h2>Giustificativi & Intemperie</h2>
+
+    <!-- SEZIONE EDILE: ASSENZA PER PIOGGIA -->
+    <div style="text-align: left; background-color: #f0f9ff; padding: 12px; border-radius: 10px; border: 1px solid #bae6fd; margin-bottom: 15px;">
+      <label><strong>🌧️ Segnalazione Pioggia / Intemperie (CIG Edilizia):</strong></label>
+      <div class="date-row" style="margin-top: 6px;">
+        <div>
+          <input type="date" id="pioggia-data" style="margin-bottom: 0;">
+        </div>
+        <div>
+          <input type="text" id="pioggia-cantiere" placeholder="Cantiere / Note opzionali..." style="margin-bottom: 0;">
+        </div>
+      </div>
+      <button class="btn btn-rain" onclick="inviaPioggia()">Registra Giornata di Pioggia</button>
+    </div>
+
     <div style="text-align: left;">
       <label><strong>Invia Protocollo Malattia INPS:</strong></label>
       <input type="text" id="protocollo-inps" placeholder="Es. PUC123456789">
@@ -134,6 +151,7 @@
     </form>
   </div>
 
+  <!-- AREA 3: INVIO DOCUMENTI E COMUNICAZIONI PERSONALI -->
   <div class="card">
     <h2>Invio Documenti e Comunicazioni</h2>
     <form id="doc-form" onsubmit="inviaDocumenti(event)" style="text-align: left;">
@@ -178,7 +196,6 @@
   </div>
 
   <script>
-    // Registrazione Service Worker per PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').then(() => {
         console.log('Service Worker Registrato!');
@@ -189,7 +206,9 @@
     let listaFileAllegati = [];
     let deferredPrompt = null;
 
-    // Intercetta il prompt nativo di installazione di Android/Chrome
+    // Imposta la data odierna come default nel campo pioggia
+    document.getElementById('pioggia-data').valueAsDate = new Date();
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -199,9 +218,6 @@
       if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('Installazione accettata!');
-          }
           deferredPrompt = null;
         });
       } else {
@@ -281,6 +297,43 @@
       saveStorage(db); checkState();
     }
 
+    // GESTIONE ASSENZA PER PIOGGIA (EDILIZIA)
+    function inviaPioggia() {
+      const dataVal = document.getElementById('pioggia-data').value;
+      const cantiereVal = document.getElementById('pioggia-cantiere').value;
+
+      if (!dataVal) {
+        alert("Seleziona una data valida per la giornata di pioggia.");
+        return;
+      }
+
+      const formattedData = new Date(dataVal).toLocaleDateString('it-IT');
+      const notaCompleta = `Assenza causa Pioggia/Intemperie${cantiereVal ? ' - Cantiere: ' + cantiereVal : ''}`;
+
+      const db = getStorage();
+      db.push({
+        data: formattedData,
+        entrata: "ASSENZA PIOGGIA",
+        uscita: "-",
+        minutiPausa: 0,
+        note: notaCompleta
+      });
+      saveStorage(db);
+      checkState();
+
+      // Invio notifica via Email
+      const subject = `[Segnalazione Pioggia CIG] Data: ${formattedData}`;
+      const bodyMail = `Comunicazione Assenza per Intemperie / Pioggia\n\n` +
+                       `Data: ${formattedData}\n` +
+                       `Cantiere / Note: ${cantiereVal || 'Non specificato'}\n\n` +
+                       `La presente per segnalare l'impossibilità di svolgere le attività lavorative causa maltempo per la gestione CIG Edilizia.`;
+
+      const mailtoUrl = `mailto:documenti.deireali@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyMail)}`;
+      
+      alert("Giornata di pioggia registrata nel report! Invio comunicazione all'amministrazione...");
+      window.location.href = mailtoUrl;
+    }
+
     function inviaMalattia() {
       const prot = document.getElementById('protocollo-inps').value;
       if (!prot) { alert("Inserisci un numero di protocollo valido."); return; }
@@ -326,7 +379,7 @@
 
     function exportReport() {
       const csv = generateCSVString();
-      const blob = new Blob([csv], { type: 'text/charset=utf-8;' });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url;
       a.download = `Report_Presenze_${new Date().getMonth() + 1}_${new Date().getFullYear()}.csv`;
