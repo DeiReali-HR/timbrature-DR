@@ -3,45 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Timbratura Dipendente</title>
+  <title>Gestionale Presenze & Timbrature</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
-    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; box-sizing: border-box; }
-    h2 { margin-top: 0; color: #1e293b; }
-    .clock { font-size: 32px; font-weight: bold; color: #0f172a; margin: 16px 0; }
-    .status { font-size: 14px; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 20px; font-weight: 600; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; box-sizing: border-box; margin-bottom: 20px; }
+    h2, h3 { margin-top: 0; color: #1e293b; }
+    .clock { font-size: 32px; font-weight: bold; color: #0f172a; margin: 12px 0; }
+    .status { font-size: 14px; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 16px; font-weight: 600; }
     .status.out { background-color: #fee2e2; color: #991b1b; }
     .status.in { background-color: #dcfce7; color: #166534; }
-    .btn-timbra { width: 100%; padding: 18px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; transition: background 0.3s; }
+    .status.pause { background-color: #fef3c7; color: #92400e; }
+    
+    .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
+    .btn { width: 100%; padding: 14px; font-size: 15px; font-weight: bold; color: white; border: none; border-radius: 10px; cursor: pointer; }
     .btn-entry { background-color: #16a34a; }
     .btn-exit { background-color: #dc2626; }
-    .btn-report { margin-top: 16px; width: 100%; padding: 12px; background-color: #2563eb; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
-    .history { margin-top: 24px; text-align: left; }
-    .history h3 { font-size: 16px; color: #334155; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    .btn-pause { background-color: #d97706; }
+    .btn-secondary { background-color: #2563eb; }
+    .btn-alt { background-color: #4f46e5; }
+    
+    input, select, textarea { width: 100%; padding: 10px; margin: 6px 0 12px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+    
+    .section-title { text-align: left; font-size: 16px; margin-top: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
     th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
     th { background-color: #f8fafc; }
   </style>
 </head>
 <body>
+
+  <!-- SCHEDA TIMBRATURA E PAUSA -->
   <div class="card">
     <h2>Timbratura Turno</h2>
     <div id="current-date" style="color: #64748b; font-size: 14px;"></div>
     <div class="clock" id="clock">00:00:00</div>
     <div id="status-badge" class="status out">Fuori Servizio</div>
-    <button id="btn-action" class="btn-timbra btn-entry" onclick="toggleTimbratura()">TIMBRA ENTRATA</button>
-    <button class="btn-report" onclick="exportReport()">Esporta Report Mensile (CSV)</button>
-    <div class="history">
-      <h3>Ultime Timbrature</h3>
-      <table id="history-table">
-        <thead>
-          <tr><th>Data</th><th>Entrata</th><th>Uscita</th><th>Ore</th></tr>
-        </thead>
-        <tbody id="history-body"></tbody>
-      </table>
+
+    <div class="btn-group">
+      <button id="btn-action" class="btn btn-entry" onclick="toggleTimbratura()">TIMBRA ENTRATA</button>
+      <button id="btn-pause" class="btn btn-pause" onclick="togglePausa()" style="display:none;">INIZIO PAUSA</button>
+    </div>
+
+    <button class="btn btn-secondary" onclick="exportReport()">Esporta Report Mensile (CSV)</button>
+
+    <div class="section-title">Ultime Timbrature</div>
+    <table>
+      <thead>
+        <tr><th>Data</th><th>Entrata</th><th>Pausa</th><th>Uscita</th><th>Note/Ritardo</th></tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </div>
+
+  <!-- SCHEDA RICHIESTE & GIUSTIFICATIVI -->
+  <div class="card">
+    <h2>Giustificativi & Malattia</h2>
+    
+    <!-- Protocollo Malattia -->
+    <div style="text-align: left;">
+      <label><strong>Invia Protocollo Malattia INPS:</strong></label>
+      <input type="text" id="protocollo-inps" placeholder="Es. PUC123456789">
+      <button class="btn btn-alt" onclick="inviaMalattia()">Registra Malattia</button>
+    </div>
+
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e2e8f0;">
+
+    <!-- Richiesta Ferie/Permessi -->
+    <div style="text-align: left;">
+      <label><strong>Richiesta Ferie / Permesso:</strong></label>
+      <select id="tipo-richiesta">
+        <option value="Ferie">Ferie</option>
+        <option value="Permesso Orario">Permesso Orario</option>
+        <option value="PAG">Permesso Retribuito</option>
+      </select>
+      <label>Data Inizio / Giorno:</label>
+      <input type="date" id="data-richiesta">
+      <label>Note / Motivazione:</label>
+      <input type="text" id="note-richiesta" placeholder="Dettagli opzionali...">
+      <button class="btn btn-secondary" onclick="inviaRichiesta()">Invia Richiesta</button>
     </div>
   </div>
+
   <script>
+    // Configurazione orario di lavoro standard per il controllo ritardo (HH:MM)
+    const ORARIO_INIZIO_TURNO = "08:30";
+
     function updateClock() {
       const now = new Date();
       document.getElementById('clock').innerText = now.toLocaleTimeString('it-IT');
@@ -49,56 +95,124 @@
     }
     setInterval(updateClock, 1000);
     updateClock();
+
     function getStorage() { return JSON.parse(localStorage.getItem('timbrature_db') || '[]'); }
     function saveStorage(data) { localStorage.setItem('timbrature_db', JSON.stringify(data)); }
+
     function checkState() {
       const db = getStorage(); const last = db[db.length - 1];
-      const btn = document.getElementById('btn-action'); const badge = document.getElementById('status-badge');
+      const btnAction = document.getElementById('btn-action');
+      const btnPause = document.getElementById('btn-pause');
+      const badge = document.getElementById('status-badge');
+
       if (last && !last.uscita) {
-        btn.innerText = "TIMBRA USCITA"; btn.className = "btn-timbra btn-exit";
-        badge.innerText = "In Servizio"; badge.className = "status in";
+        btnAction.innerText = "TIMBRA USCITA"; btnAction.className = "btn btn-exit";
+        btnPause.style.display = "block";
+        
+        if (last.inPausa) {
+          badge.innerText = "In Pausa"; badge.className = "status pause";
+          btnPause.innerText = "FINE PAUSA";
+        } else {
+          badge.innerText = "In Servizio"; badge.className = "status in";
+          btnPause.innerText = "INIZIO PAUSA";
+        }
       } else {
-        btn.innerText = "TIMBRA ENTRATA"; btn.className = "btn-timbra btn-entry";
+        btnAction.innerText = "TIMBRA ENTRATA"; btnAction.className = "btn btn-entry";
+        btnPause.style.display = "none";
         badge.innerText = "Fuori Servizio"; badge.className = "status out";
       }
       renderTable();
     }
+
     function toggleTimbratura() {
       const db = getStorage(); const last = db[db.length - 1]; const now = new Date();
       const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
       const dateStr = now.toLocaleDateString('it-IT');
+
       if (last && !last.uscita) {
+        // Timbra Uscita
         last.uscita = timeStr;
-        const entryTime = new Date(last.timestampEntrata);
-        const diffMinutes = Math.round((now - entryTime) / (1000 * 60));
-        last.ore = (diffMinutes / 60).toFixed(2);
+        if (last.inPausa) last.inPausa = false;
       } else {
-        db.push({ data: dateStr, entrata: timeStr, uscita: "", ore: "0", timestampEntrata: now.toISOString() });
+        // Timbra Entrata (Verifica Ritardo)
+        let note = "";
+        if (timeStr > ORARIO_INIZIO_TURNO) {
+          const motivo = prompt(`Sei in ritardo rispetto alle ${ORARIO_INIZIO_TURNO}. Inserisci il giustificativo/motivazione:`);
+          note = motivo ? `Ritardo: ${motivo}` : "Ritardo non giustificato";
+        }
+        db.push({ data: dateStr, entrata: timeStr, uscita: "", minutiPausa: 0, inPausa: false, note: note });
       }
       saveStorage(db); checkState();
     }
+
+    function togglePausa() {
+      const db = getStorage(); const last = db[db.length - 1];
+      if (!last || last.uscita) return;
+
+      const now = new Date();
+      if (!last.inPausa) {
+        last.inPausa = true;
+        last.inizioPausa = now.getTime();
+      } else {
+        last.inPausa = false;
+        const durataPausa = Math.round((now.getTime() - last.inizioPausa) / 60000); // minuti
+        last.minutiPausa = (last.minutiPausa || 0) + durataPausa;
+      }
+      saveStorage(db); checkState();
+    }
+
+    function inviaMalattia() {
+      const prot = document.getElementById('protocollo-inps').value;
+      if (!prot) { alert("Inserisci un numero di protocollo valido."); return; }
+      const db = getStorage();
+      db.push({ data: new Date().toLocaleDateString('it-IT'), entrata: "MALATTIA", uscita: "-", minutiPausa: 0, note: `Prot. INPS: ${prot}` });
+      saveStorage(db);
+      document.getElementById('protocollo-inps').value = "";
+      checkState();
+      alert("Protocollo malattia registrato con successo!");
+    }
+
+    function inviaRichiesta() {
+      const tipo = document.getElementById('tipo-richiesta').value;
+      const data = document.getElementById('data-richiesta').value;
+      const note = document.getElementById('note-richiesta').value;
+      if (!data) { alert("Seleziona una data."); return; }
+      const db = getStorage();
+      db.push({ data: new Date(data).toLocaleDateString('it-IT'), entrata: tipo.toUpperCase(), uscita: "-", minutiPausa: 0, note: note || "In attesa approvazione" });
+      saveStorage(db);
+      document.getElementById('note-richiesta').value = "";
+      checkState();
+      alert(`Richiesta ${tipo} inviata con successo!`);
+    }
+
     function renderTable() {
       const db = getStorage(); const tbody = document.getElementById('history-body'); tbody.innerHTML = "";
       const recent = db.slice(-5).reverse();
       recent.forEach(item => {
-        tbody.innerHTML += `<tr><td>${item.data}</td><td>${item.entrata}</td><td>${item.uscita || '-'}</td><td>${item.ore}h</td></tr>`;
+        tbody.innerHTML += `<tr>
+          <td>${item.data}</td>
+          <td>${item.entrata}</td>
+          <td>${item.minutiPausa ? item.minutiPausa + 'm' : '-'}</td>
+          <td>${item.uscita || '-'}</td>
+          <td>${item.note || '-'}</td>
+        </tr>`;
       });
     }
+
     function exportReport() {
       const db = getStorage();
       if (db.length === 0) { alert("Nessun dato da esportare."); return; }
-      let csv = "Data,Ingresso,Uscita,Ore Totali\n"; let totaleOre = 0;
+      let csv = "Data,Ingresso,Pausa(minuti),Uscita,Note/Giustificativo\n";
       db.forEach(item => {
-        csv += `${item.data},${item.entrata},${item.uscita || 'N/A'},${item.ore}\n`;
-        totaleOre += parseFloat(item.ore || 0);
+        csv += `"${item.data}","${item.entrata}","${item.minutiPausa || 0}","${item.uscita || '-'}","${item.note || '-'}"\n`;
       });
-      csv += `\nTOTALE ORE MESE,,${totaleOre.toFixed(2)}h\n`;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url;
-      a.download = `Report_Timbrature_${new Date().getMonth() + 1}_${new Date().getFullYear()}.csv`;
+      a.download = `Report_Presenze_${new Date().getMonth() + 1}_${new Date().getFullYear()}.csv`;
       a.click();
     }
+
     checkState();
   </script>
 </body>
